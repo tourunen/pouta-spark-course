@@ -4,16 +4,41 @@
     dest: /etc/resolv.conf
     insertafter: '^search.*'
     line: "nameserver {{ hostvars[item]['ansible_ssh_host'] }}"
-  with_items: groups['masters']
+  with_items: "{{ groups['masters'] }}"
 
 - name: make sure our local DNS gets inserted by dhclient too
   lineinfile:
     dest: /etc/dhcp/dhclient.conf
     line: "prepend domain-name-servers {{ hostvars[item]['ansible_ssh_host'] }};"
-  with_items: groups['masters']
+  with_items: "{{ groups['masters'] }}"
 
 - name: add default iptables persistent state file
   template:
     src: etc/sysconfig/iptables.j2
     dest: /etc/sysconfig/iptables
     force: no
+
+- name: generate ssh key for cloud-user
+  user: name=cloud-user generate_ssh_key=yes ssh_key_type=rsa
+  when: inventory_hostname in groups.masters
+
+- name: download public key from master
+  fetch: dest=/tmp/ flat=true src=.ssh/id_rsa.pub
+  when: inventory_hostname in groups.masters
+
+- name: authorize ssh with the downloaded key
+  authorized_key: user=cloud-user key="{{ lookup('file', '/tmp/id_rsa.pub') }}"
+
+- name: install openjdk
+  yum: name={{ item }}
+  with_items:
+    - java-1.8.0-openjdk
+
+- name: fix jdk slow random source
+  lineinfile:
+    name: /etc/alternatives/jre/lib/security/java.security
+    regexp: '^securerandom.source.*'
+    line: 'securerandom.source=file:/dev/urandom'
+    state: present
+
+- include: setup_block_storage.yml

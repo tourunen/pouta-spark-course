@@ -1,0 +1,42 @@
+- name: Scan for vg_data volume group
+  command: vgdisplay vg_data
+  register: test_vg_data
+  ignore_errors: yes
+
+- name: Create a physical volume on {{ data_block_dev_path }}
+  command: /usr/sbin/pvcreate {{ data_block_dev_path }}
+  when: test_vg_data.rc==5
+
+- name: Create volume group on ephemeral
+  lvg: vg=vg_data pvs={{ data_block_dev_path }}
+  when: test_vg_data.rc==5
+
+- name: Check for swap
+  shell: 'swapon -s | grep -E "^/"'
+  register: swap_configured
+  ignore_errors: yes
+
+- name: Create logical volume for swap
+  lvol: lv=swap vg=vg_data size={{ ansible_memtotal_mb * 2 }}M
+  when: swap_configured|failed
+
+- name: Run mkswap on swap lv
+  command: mkswap /dev/mapper/vg_data-swap
+  when: swap_configured|failed
+
+- command: 'swapon /dev/mapper/vg_data-swap'
+  when: swap_configured|failed
+
+- name: Create logical volume for /mnt/data
+  lvol: lv=data vg=vg_data size="100%FREE"
+
+- name: make sure local_data_dir exists
+  file: path=/mnt/data state=directory
+
+- name: format local data
+  filesystem: fstype=ext4 dev=/dev/mapper/vg_data-data opts="-L data"
+  when: data_block_dev_path is defined
+
+- name: mount local data
+  action: mount name=/mnt/data src=LABEL=data fstype=auto opts=rw,nofail state=mounted
+  when: data_block_dev_path is defined

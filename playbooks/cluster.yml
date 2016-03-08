@@ -4,28 +4,30 @@
   connection: local
   vars:
     cluster_name: "spark-cluster"
-    master_flavor: "mini"
+    master_flavor: "small"
     num_nodes: 2
-    node_flavor: "mini"
+    node_flavor: "small"
     ssh_key: cluster_key
     boot_from_volume: yes
     network_name: ""
     bastion_secgroup: "bastion"
+    data_volume_size: 200
+    data_volume_type: "standard"
   tasks:
-    - name: bastion SG - create
+    - name: bastion security group - create
       register: sg_bastion
       os_security_group:
         name: "{{ bastion_secgroup }}"
         description: "Ansible generated security group for bastion"
       tags: ['secgroup_creation']
 
-    - name: master SG - create
+    - name: master security group - create
       os_security_group:
         name: "{{ cluster_name }}-master"
         description: "Ansible generated security group for {{ cluster_name }} master"
       tags: ['secgroup_creation']
 
-    - name: common SG - create
+    - name: common security group - create
       register: sg_common
       os_security_group:
         name: "{{ cluster_name }}-common"
@@ -33,7 +35,7 @@
       tags: ['secgroup_creation']
 
     # remote_group workaround for https://github.com/ansible/ansible-modules-core/issues/2855
-    - name: common SG - open cluster internal access
+    - name: common security group - open cluster internal access
       os_security_group_rule:
         security_group: "{{ cluster_name }}-common"
         remote_group: "{{ item[0] }}"
@@ -45,16 +47,16 @@
 
     - name: create persistent data volume for master
       os_volume:
-        display_name: "{{ cluster_name }}-persistent-data"
-        size: 200
-        volume_type: standard
+        display_name: "{{ cluster_name }}-master-data"
+        size: "{{ data_volume_size }}"
+        volume_type: "{{ data_volume_type }}"
         state: present
 
     - name: create cluster master VM
       register: master_vm
       os_server:
         name: "{{ cluster_name }}-master"
-        flavor: "mini"
+        flavor: "{{ master_flavor }}"
         image: "CentOS-7.0"
         key_name: "{{ ssh_key }}"
         network: "{{ network_name }}"
@@ -64,13 +66,13 @@
         auto_ip: yes
         boot_from_volume: "{{ boot_from_volume }}"
         terminate_volume: yes
-        volume_size: 16
+        volume_size: 50
       tags: ['vm_creation']
 
-    - name: attach persistent data volume
+    - name: attach master data volume
       os_server_volume:
         server: "{{ cluster_name }}-master"
-        volume: "{{ cluster_name }}-persistent-data"
+        volume: "{{ cluster_name }}-master-data"
 
     - name: add master to inventory
       add_host:
@@ -82,11 +84,19 @@
         public_name: "{{ lookup('dig', master_vm.openstack.public_v4 + '/PTR', wantlist=True)[0] }}"
       tags: ['vm_creation']
 
+    - name: create persistent data volumes for nodes
+      os_volume:
+        display_name: "{{ cluster_name }}-node-{{ item }}-data"
+        size: "{{ data_volume_size }}"
+        volume_type: "{{ data_volume_type }}"
+        state: present
+      with_sequence: count={{ num_nodes }}
+
     - name: create node VMs
       register: node_vms
       os_server:
         name: "{{ cluster_name }}-node-{{ item }}"
-        flavor: "mini"
+        flavor: "{{ node_flavor }}"
         image: "CentOS-7.0"
         key_name: "{{ ssh_key }}"
         network: "{{ network_name }}"
@@ -95,9 +105,15 @@
         auto_ip: no
         boot_from_volume: "{{ boot_from_volume }}"
         terminate_volume: yes
-        volume_size: 16
+        volume_size: 50
       with_sequence: count={{ num_nodes }}
       tags: ['vm_creation']
+
+    - name: attach node data volumes
+      os_server_volume:
+        server: "{{ cluster_name }}-node-{{ item }}"
+        volume: "{{ cluster_name }}-node-{{ item }}-data"
+      with_sequence: count={{ num_nodes }}
 
     - name: add nodes to inventory
       add_host:
@@ -133,6 +149,8 @@
   hosts:
     - masters
     - nodes
+  vars:
+    data_block_dev_path: "/dev/vdc"
   become: yes
   roles:
     - base
@@ -144,3 +162,4 @@
   become: yes
   roles:
     - cluster_master
+    - ambari_server

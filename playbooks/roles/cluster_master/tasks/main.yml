@@ -6,7 +6,7 @@
     dest: /etc/hosts
     line: "{{ hostvars[item]['ansible_ssh_host'] }} {{ item }} {{ item }}.novalocal"
   when: hostvars[item]['ansible_ssh_host'] is defined
-  with_items: groups['all']
+  with_items: "{{ groups['all'] }}"
   notify: restart_dnsmasq
 
 # http://developerblog.redhat.com/2015/11/19/dns-your-openshift-v3-cluster/
