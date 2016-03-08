@@ -1,0 +1,146 @@
+---
+- name: Deploy cluster base in cPouta
+  hosts: localhost
+  connection: local
+  vars:
+    cluster_name: "spark-cluster"
+    master_flavor: "mini"
+    num_nodes: 2
+    node_flavor: "mini"
+    ssh_key: cluster_key
+    boot_from_volume: yes
+    network_name: ""
+    bastion_secgroup: "bastion"
+  tasks:
+    - name: bastion SG - create
+      register: sg_bastion
+      os_security_group:
+        name: "{{ bastion_secgroup }}"
+        description: "Ansible generated security group for bastion"
+      tags: ['secgroup_creation']
+
+    - name: master SG - create
+      os_security_group:
+        name: "{{ cluster_name }}-master"
+        description: "Ansible generated security group for {{ cluster_name }} master"
+      tags: ['secgroup_creation']
+
+    - name: common SG - create
+      register: sg_common
+      os_security_group:
+        name: "{{ cluster_name }}-common"
+        description: "Ansible generated security group for {{ cluster_name }} nodes"
+      tags: ['secgroup_creation']
+
+    # remote_group workaround for https://github.com/ansible/ansible-modules-core/issues/2855
+    - name: common SG - open cluster internal access
+      os_security_group_rule:
+        security_group: "{{ cluster_name }}-common"
+        remote_group: "{{ item[0] }}"
+        protocol: "{{ item[1] }}"
+      with_nested:
+        - ["{{ sg_common.secgroup.id }}", "{{ sg_bastion.secgroup.id }}" ]
+        - ["tcp", "udp", "icmp"]
+      tags: ['secgroup_creation']
+
+    - name: create persistent data volume for master
+      os_volume:
+        display_name: "{{ cluster_name }}-persistent-data"
+        size: 200
+        volume_type: standard
+        state: present
+
+    - name: create cluster master VM
+      register: master_vm
+      os_server:
+        name: "{{ cluster_name }}-master"
+        flavor: "mini"
+        image: "CentOS-7.0"
+        key_name: "{{ ssh_key }}"
+        network: "{{ network_name }}"
+        security_groups:
+          - "{{ cluster_name }}-common"
+          - "{{ cluster_name }}-master"
+        auto_ip: yes
+        boot_from_volume: "{{ boot_from_volume }}"
+        terminate_volume: yes
+        volume_size: 16
+      tags: ['vm_creation']
+
+    - name: attach persistent data volume
+      os_server_volume:
+        server: "{{ cluster_name }}-master"
+        volume: "{{ cluster_name }}-persistent-data"
+
+    - name: add master to inventory
+      add_host:
+        name: "{{ cluster_name }}-master"
+        groups: masters
+        ansible_ssh_host: "{{ master_vm.openstack.private_v4 }}"
+        ansible_ssh_user: cloud-user
+        public_ip: "{{ master_vm.openstack.public_v4 }}"
+        public_name: "{{ lookup('dig', master_vm.openstack.public_v4 + '/PTR', wantlist=True)[0] }}"
+      tags: ['vm_creation']
+
+    - name: create node VMs
+      register: node_vms
+      os_server:
+        name: "{{ cluster_name }}-node-{{ item }}"
+        flavor: "mini"
+        image: "CentOS-7.0"
+        key_name: "{{ ssh_key }}"
+        network: "{{ network_name }}"
+        security_groups:
+          - "{{ cluster_name }}-common"
+        auto_ip: no
+        boot_from_volume: "{{ boot_from_volume }}"
+        terminate_volume: yes
+        volume_size: 16
+      with_sequence: count={{ num_nodes }}
+      tags: ['vm_creation']
+
+    - name: add nodes to inventory
+      add_host:
+        name: "{{ item.openstack.name }}"
+        groups: nodes
+        ansible_ssh_host: "{{ item.openstack.private_v4 }}"
+        ansible_ssh_user: cloud-user
+      with_items: "{{ node_vms.results }}"
+      tags: ['vm_creation']
+
+    - name: wait for master to come up
+      command: >
+        ssh -o BatchMode=yes
+        cloud-user@{{ master_vm.openstack.private_v4 }} true
+      register: result
+      until: result|success
+      retries: 300
+      delay: 5
+      tags: ["wait_for_ssh"]
+
+    - name: wait for nodes to come up
+      command: >
+        ssh -o BatchMode=yes
+        cloud-user@{{ item.openstack.private_v4 }} true
+      register: result
+      until: result|success
+      retries: 300
+      delay: 5
+      with_items: "{{ node_vms.results }}"
+      tags: ["wait_for_ssh"]
+
+- name: Configure common parts
+  hosts:
+    - masters
+    - nodes
+  become: yes
+  roles:
+    - base
+    - cluster_common
+
+- name: Configure master
+  hosts:
+    - masters
+  become: yes
+  roles:
+    - cluster_master

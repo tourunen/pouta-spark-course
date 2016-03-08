@@ -1,0 +1,19 @@
+---
+- name: point resolv.conf to master(s)
+  lineinfile:
+    dest: /etc/resolv.conf
+    insertafter: '^search.*'
+    line: "nameserver {{ hostvars[item]['ansible_ssh_host'] }}"
+  with_items: groups['masters']
+
+- name: make sure our local DNS gets inserted by dhclient too
+  lineinfile:
+    dest: /etc/dhcp/dhclient.conf
+    line: "prepend domain-name-servers {{ hostvars[item]['ansible_ssh_host'] }};"
+  with_items: groups['masters']
+
+- name: add default iptables persistent state file
+  template:
+    src: etc/sysconfig/iptables.j2
+    dest: /etc/sysconfig/iptables
+    force: no

@@ -1,0 +1,26 @@
+---
+
+- name: add entries to /etc/hosts for all cluster members
+  lineinfile:
+    state: present
+    dest: /etc/hosts
+    line: "{{ hostvars[item]['ansible_ssh_host'] }} {{ item }} {{ item }}.novalocal"
+  when: hostvars[item]['ansible_ssh_host'] is defined
+  with_items: groups['all']
+  notify: restart_dnsmasq
+
+# http://developerblog.redhat.com/2015/11/19/dns-your-openshift-v3-cluster/
+- name: install dnsmasq
+  yum: name=dnsmasq state=present
+
+- name: enable and run dnsmasq service
+  service:
+    name: dnsmasq
+    enabled: yes
+    state: started
+
+- name: open ports 53 for DNS
+  lineinfile:
+    line: "-A INPUT -p udp -m udp --dport 53 -j ACCEPT"
+    dest: /etc/sysconfig/iptables
+    insertbefore: '^-A INPUT'

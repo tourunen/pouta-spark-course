@@ -1,0 +1,55 @@
+---
+- name: Create bastion host
+  hosts: localhost
+  connection: local
+  vars:
+    bastion_key: bastion_key
+    bastion_security_groups: default,bastion
+    bastion_floating_ip: 86.50.xxx.xxx
+    bastion_ssh_access:
+      - "xxx.xxx.xxx.xxx/32"
+
+  tasks:
+    - name: Security group - create
+      os_security_group:
+        name: "bastion"
+        description: "Ansible generated security group for bastion host"
+
+    - name: Security group - Open ssh access to selected addresses
+      os_security_group_rule:
+        security_group: "bastion"
+        protocol: tcp
+        port_range_min: 22
+        port_range_max: 22
+        remote_ip_prefix: "{{ item }}"
+      with_items: "{{ bastion_ssh_access }}"
+
+    - name: Create the bastion host VM
+      register: bastion_vm
+      os_server:
+        name: "bastion"
+        flavor: "mini"
+        image: "CentOS-7.0"
+        key_name: "{{ bastion_key }}"
+        security_groups: "{{ bastion_security_groups }}"
+        floating_ips:
+          - "{{ bastion_floating_ip }}"
+
+    - name: Add bastion to inventory
+      add_host:
+        name: pb-bastion
+        groups: pb-bastion
+        ansible_ssh_host: "{{ bastion_vm.server.accessIPv4 }}"
+        ansible_ssh_user: cloud-user
+
+    - name: Wait for instance to be ready
+      wait_for:
+        host: "{{ bastion_floating_ip }}"
+        port: 22
+        search_regex: OpenSSH
+
+- name: Configure the bastion host VM
+  hosts: bastion
+  become: yes
+  roles:
+    - base

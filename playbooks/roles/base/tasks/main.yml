@@ -1,0 +1,57 @@
+- name: update key apt repositories
+  template:
+    src: etc/apt/sources.list.j2
+    dest: /etc/apt/sources.list
+    backup: yes
+  when: ansible_lsb.id=="Ubuntu"
+
+- name: Ensure that package cache is updated
+  apt: update_cache=yes cache_valid_time=36000
+  when: ansible_lsb.id=="Ubuntu"
+
+- name: Install basic tools (Ubuntu)
+  apt: pkg={{item}} state=present
+  with_items:
+    - dstat
+    - lsof
+    - bash-completion
+    - time
+    - tmux
+    - git
+    - xauth
+    - screen
+    - nano
+    - vim
+    - nc
+  when: ansible_lsb.id=="Ubuntu"
+
+- name: Install basic tools (CentOS)
+  yum: pkg={{item}} state=present
+  with_items:
+    - dstat
+    - lsof
+    - bash-completion
+    - time
+    - tmux
+    - git
+    - xauth
+    - screen
+    - nano
+    - vim
+    - bind-utils
+    - nmap-ncat
+  when: ansible_lsb.id=="CentOS"
+
+- name: stop cloud-init managing /etc/hosts
+  lineinfile:
+    dest: /etc/cloud/cloud.cfg.d/10_etc_hosts.cfg
+    state: present
+    regexp: '^manage_etc_hosts'
+    line: 'manage_etc_hosts: False'
+    create: yes
+
+- name: fix /etc/hosts after cloud-init
+  lineinfile:
+    dest: /etc/hosts
+    state: absent
+    regexp: "^127.0.0.1(.*){{ inventory_hostname }}(.*)"
