@@ -3,11 +3,10 @@
     url: http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.2.0.0/ambari.repo
     dest: /etc/yum.repos.d/ambari.repo
 
-- name: install ambari-server and openjdk
+- name: install ambari-server
   yum: name={{ item }}
   with_items:
     - ambari-server
-    - java-1.8.0-openjdk
 
 - name: run ambari setup
   shell: ambari-server setup -j /etc/alternatives/jre -s

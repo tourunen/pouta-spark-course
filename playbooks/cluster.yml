@@ -151,6 +151,7 @@
     - nodes
   vars:
     data_block_dev_path: "/dev/vdc"
+    selinux_state: "disabled"
   become: yes
   roles:
     - base
@@ -163,3 +164,4 @@
   roles:
     - cluster_master
     - ambari_server
+    - notebook_host

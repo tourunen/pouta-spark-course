@@ -1,0 +1,6 @@
+- name: disable auto-updates on Pouta (these can cause container restarts)
+  file: name=/etc/cron.daily/automatic_updates state=absent
+
+- name: install docker
+  yum: name=docker state=present
+

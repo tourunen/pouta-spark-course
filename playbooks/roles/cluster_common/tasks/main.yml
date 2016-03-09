@@ -1,4 +1,13 @@
 ---
+- name: add entries to /etc/hosts for all cluster members
+  lineinfile:
+    state: present
+    dest: /etc/hosts
+    line: "{{ hostvars[item]['ansible_ssh_host'] }} {{ item }} {{ item }}.novalocal"
+  when: hostvars[item]['ansible_ssh_host'] is defined
+  with_items: "{{ groups['all'] }}"
+  notify: restart_dnsmasq
+
 - name: point resolv.conf to master(s)
   lineinfile:
     dest: /etc/resolv.conf
@@ -40,5 +49,9 @@
     regexp: '^securerandom.source.*'
     line: 'securerandom.source=file:/dev/urandom'
     state: present
+
+- name: disable SELinux
+  selinux: state="{{ selinux_state }}"
+  when: selinux_state is defined
 
 - include: setup_block_storage.yml
