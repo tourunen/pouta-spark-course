@@ -4,9 +4,9 @@
   connection: local
   vars:
     cluster_name: "spark-cluster"
-    master_flavor: "small"
+    master_flavor: "mini"
     num_nodes: 2
-    node_flavor: "small"
+    node_flavor: "mini"
     ssh_key: cluster_key
     boot_from_volume: yes
     network_name: ""
