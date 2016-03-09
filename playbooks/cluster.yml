@@ -157,6 +157,7 @@
   roles:
     - base
     - cluster_common
+    - conda
 
 - name: Configure master
   hosts:
