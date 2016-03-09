@@ -8,3 +8,9 @@
   with_items:
     - ambari-server
     - java-1.8.0-openjdk
+
+- name: run ambari setup
+  shell: ambari-server setup -j /etc/alternatives/jre -s
+
+- name: start ambari service
+  service: name=ambari-server state=running enabled=yes
