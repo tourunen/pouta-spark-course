@@ -8,7 +8,8 @@
     num_nodes: 2
     node_flavor: "mini"
     ssh_key: cluster_key
-    boot_from_volume: yes
+    master_boot_from_volume: yes
+    node_boot_from_volume: yes
     network_name: ""
     bastion_secgroup: "bastion"
     data_volume_size: 200
@@ -64,7 +65,7 @@
           - "{{ cluster_name }}-common"
           - "{{ cluster_name }}-master"
         auto_ip: yes
-        boot_from_volume: "{{ boot_from_volume }}"
+        boot_from_volume: "{{ master_boot_from_volume }}"
         terminate_volume: yes
         volume_size: 50
       tags: ['vm_creation']
@@ -103,7 +104,7 @@
         security_groups:
           - "{{ cluster_name }}-common"
         auto_ip: no
-        boot_from_volume: "{{ boot_from_volume }}"
+        boot_from_volume: "{{ node_boot_from_volume }}"
         terminate_volume: yes
         volume_size: 50
       with_sequence: count={{ num_nodes }}
@@ -151,6 +152,7 @@
     - nodes
   vars:
     data_block_dev_path: "/dev/vdc"
+    selinux_state: "disabled"
   become: yes
   roles:
     - base
@@ -163,3 +165,4 @@
   roles:
     - cluster_master
     - ambari_server
+    - notebook_host
