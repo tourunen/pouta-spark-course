@@ -162,15 +162,12 @@ On the Ambari dashboard click 'Launch Install Wizard'
   - *Host Registration Information* : Paste the SSH Private Key from the cluster (Discussed earlier), including BEGIN and END lines.
 4. **Choose Services** : Just select HDFS, Yarn + MapReduce2, Zookeeper, Ambari Metrics and Spark. Uncheck every other option.
 5. **Assign Masters**: Move every component to cluster master and keep only zookeepers in the other nodes
-5. **Assign Slaves and Clients** : Check Client and NodeManager, only for master and DataNode on all the nodes except master.
+5. **Assign Slaves and Clients** : Check Client only for master. Check DataNode and NodeManager for all the nodes except master.
 6. **Customize Services** : The following configurations should be used:
   - *HDFS* : Provide the namenode directory as `/mnt/data/hadoop/hdfs/namenode` and datanode directory as `/mnt/data/hadoop/hdfs/data`
 
-  - *YARN* : Go to Advanced tab -> Scheduler -> Capacity Scheduler and modify the following properties (DONT USE THIS NOW, wip)
-  ```
-  yarn.scheduler.capacity.root.default.minimum-user-limit-percent=<min_user_limit_percent>  # min_user_limit_percent = 100 / max users allowed
-  yarn.scheduler.capacity.root.default.user-limit-factor=<user_limit_factor>  # user_limit_factor = 1 / max users allowed
-  ```
+  - *YARN* : WIP
+
     Click Proceed anyway on any pop-up dialog warning
 7. **Review** : Check the configurations and then press Deploy
 8. **Install, Start and Test** : Wait for the installations to finish. If done, press Next
@@ -191,13 +188,7 @@ Pull the jupyter/pyspark-notebook image to use with tmpnb
 
 Build the docker image for a patched version of tmpnb
 
-    sudo docker build https://github.com/apurva3000/tmpnb
-
-Then run `sudo docker images` and note down the IMAGE ID for the image which has 'None' listed in repo and tag columns.
-
-Use the IMAGE ID to tag our created image 
-
-    sudo docker tag <IMAGE ID> csc/tmpnb
+    sudo docker build -t csc/tmpnb https://github.com/apurva3000/tmpnb.git
 
 Setup the proxy first to run tmpnb
 
