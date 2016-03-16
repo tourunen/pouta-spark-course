@@ -25,6 +25,7 @@
     - nc
     - lvm2
     - ntp
+    - bzip2
   when: ansible_lsb.id=="Ubuntu"
 
 - name: Install basic tools (CentOS)
@@ -44,6 +45,7 @@
     - nmap-ncat
     - lvm2
     - ntp
+    - bzip2
   when: ansible_lsb.id=="CentOS"
 
 - name: stop cloud-init managing /etc/hosts
