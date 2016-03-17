@@ -1,0 +1,47 @@
+- name: Destroy a cluster deployed by cluster.yml
+  hosts: localhost
+  connection: local
+  vars:
+    cluster_name: "spark-cluster"
+    num_nodes: 2
+    remove_master: "no"
+    remove_nodes: "no"
+    remove_master_volumes: "no"
+    remove_node_volumes: "no"
+    remove_security_groups: "no"
+
+  tasks:
+    - name: remove node VMs
+      os_server:
+        name: "{{ cluster_name }}-node-{{ item }}"
+        state: absent
+      with_sequence: count={{ num_nodes }}
+      when: remove_nodes | bool
+
+    - name: remove master VM
+      os_server:
+        name: "{{ cluster_name }}-master"
+        state: absent
+      when: remove_master | bool
+
+    - name: remove node volumes
+      os_volume:
+        display_name: "{{ cluster_name }}-node-{{ item }}-data"
+        state: absent
+      with_sequence: count={{ num_nodes }}
+      when: remove_node_volumes | bool
+
+    - name: remove master volumes
+      os_volume:
+        display_name: "{{ cluster_name }}-master-data"
+        state: absent
+      when: remove_master_volumes | bool
+
+    - name: remove security groups
+      os_security_group:
+        name: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ cluster_name }}-common"
+        - "{{ cluster_name }}-master"
+      when: remove_security_groups | bool
