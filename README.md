@@ -121,7 +121,7 @@ Change the permissions on the config file
 
     chmod 600 ~/.ssh/config
 
-Examine pouta-spark-course/playbooks/cluster.yml, and edit to taste. Variables can be 
+Examine *pouta-spark-course/playbooks/cluster.yml*, and edit to taste. Variables can be 
 also overridden on the command line, like in the example below 
 
 Run the playbook
@@ -141,8 +141,36 @@ There is an auto-generated SSH Private Key, which we will use later.
 
 **Proxying Solution Here (Instance Security Groups)**
 
+Setup https for ambari server. First stop ambari-server
+ 
+    sudo systemctl stop ambari-server
+    
+Then configure https 
+
+    sudo ambari-server setup-security
+
+    Security setup options...
+    ===========================================================================
+    Choose one of the following options: 
+      [1] Enable HTTPS for Ambari server.
+      [2] Encrypt passwords stored in ambari.properties file.
+      [3] Setup Ambari kerberos JAAS configuration.
+      [4] Setup truststore.
+      [5] Import certificate to truststore.
+    ===========================================================================
+    Enter choice, (1-5): 1
+    Do you want to configure HTTPS [y/n] (y)? 
+    SSL port [8443] ? 
+    Enter path to Certificate: /etc/ambari-server/ssl/server.crt
+    Enter path to Private Key: /etc/ambari-server/ssl/server.key
+    Please enter password for Private Key: 
+
+Start the server once again
+
+    sudo systemctl start ambari-server
+
 Check the public ip of your cluster master (Openstack UI)
-Open a browser and navigate to http://\<public-ip-of-the-cluster-master\>:8080
+Open a browser and navigate to https://\<public-ip-of-the-cluster-master\>:8443
 
 Login to the Ambari dashboard using default credentials
 
@@ -196,7 +224,8 @@ Setup the proxy first to run tmpnb
     
     sudo docker run --net=host -d -e CONFIGPROXY_AUTH_TOKEN=$TOKEN --name=proxy jupyter/configurable-http-proxy --default-target http://127.0.0.1:9999
 
-Now run the image which we just built and tagged
+Now run the image which we just built and tagged. This runs 2 notebook containers, keeping tmpnb in the foreground - 
+good for debugging
 
     sudo docker run -it \
         --net=host \
