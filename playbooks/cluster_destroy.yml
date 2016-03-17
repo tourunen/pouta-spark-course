@@ -5,8 +5,10 @@
     cluster_name: "spark-cluster"
     num_nodes: 2
     remove_master: "no"
+    remove_notebook: "no"
     remove_nodes: "no"
     remove_master_volumes: "no"
+    remove_notebook_volumes: "no"
     remove_node_volumes: "no"
     remove_security_groups: "no"
 
@@ -24,6 +26,12 @@
         state: absent
       when: remove_master | bool
 
+    - name: remove notebook VM
+      os_server:
+        name: "{{ cluster_name }}-notebook"
+        state: absent
+      when: remove_notebook | bool
+
     - name: remove node volumes
       os_volume:
         display_name: "{{ cluster_name }}-node-{{ item }}-data"
@@ -37,6 +45,12 @@
         state: absent
       when: remove_master_volumes | bool
 
+    - name: remove notebook volumes
+      os_volume:
+        display_name: "{{ cluster_name }}-notebook-data"
+        state: absent
+      when: remove_notebook_volumes | bool
+
     - name: remove security groups
       os_security_group:
         name: "{{ item }}"
@@ -44,4 +58,5 @@
       with_items:
         - "{{ cluster_name }}-common"
         - "{{ cluster_name }}-master"
+        - "{{ cluster_name }}-notebook"
       when: remove_security_groups | bool

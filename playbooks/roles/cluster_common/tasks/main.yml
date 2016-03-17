@@ -50,8 +50,6 @@
     line: 'securerandom.source=file:/dev/urandom'
     state: present
 
-- name: disable SELinux
+- name: set SELinux state
   selinux: state="{{ selinux_state }}"
   when: selinux_state is defined
-
-- include: setup_block_storage.yml
