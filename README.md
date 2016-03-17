@@ -224,6 +224,10 @@ Setup the proxy first to run tmpnb
     
     sudo docker run --net=host -d -e CONFIGPROXY_AUTH_TOKEN=$TOKEN --name=proxy jupyter/configurable-http-proxy --default-target http://127.0.0.1:9999
 
+Generate a password hash for the notebooks
+
+    sudo docker run jupyter/pyspark-notebook python3 -c "from IPython.lib import passwd; print(passwd('dont_use_this'))"
+    
 Now run the image which we just built and tagged. This runs 2 notebook containers, keeping tmpnb in the foreground - 
 good for debugging
 
@@ -241,8 +245,8 @@ good for debugging
                 "--NotebookApp.base_url={base_path} \
                 --ip=0.0.0.0 \
                 --port={port} \
+                --NotebookApp.password=THE_HASH_FROM_ABOVE \
                 --NotebookApp.trust_xheaders=True"'
-
 
 After the containers start running (Can be checked by `sudo docker ps -a`), open the browser and point to http://\<public-ip>:8000
 
