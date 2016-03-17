@@ -224,7 +224,8 @@ Setup the proxy first to run tmpnb
     
     sudo docker run --net=host -d -e CONFIGPROXY_AUTH_TOKEN=$TOKEN --name=proxy jupyter/configurable-http-proxy --default-target http://127.0.0.1:9999
 
-Now run the image which we just built and tagged
+Now run the image which we just built and tagged. This runs 2 notebook containers, keeping tmpnb in the foreground - 
+good for debugging
 
     sudo docker run -it \
         --net=host \
@@ -232,7 +233,7 @@ Now run the image which we just built and tagged
         -v /var/run/docker.sock:/docker.sock \
         csc/tmpnb \
         python orchestrate.py \
-            --pool_size=8 \
+            --pool_size=2 \
             --host_directories=/usr/hdp/:/usr/hdp/:ro,/etc/hadoop/:/etc/hadoop/:ro \
             --host_network=True \
             --image='jupyter/pyspark-notebook' \
