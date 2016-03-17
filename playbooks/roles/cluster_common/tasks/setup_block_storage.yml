@@ -47,16 +47,16 @@
     fstype: swap
     state: present
 
-- name: Create logical volume for /mnt/data
+- name: Create logical volume for {{ data_dir_path }}
   lvol: lv=data vg=vg_data size="100%FREE"
 
 - name: make sure local_data_dir exists
-  file: path=/mnt/data state=directory
+  file: path={{ data_dir_path }} state=directory
 
 - name: format local data
   filesystem: fstype=ext4 dev=/dev/mapper/vg_data-data opts="-L data"
   when: data_block_dev_path is defined
 
 - name: mount local data
-  action: mount name=/mnt/data src=LABEL=data fstype=auto opts=rw,nofail state=mounted
+  action: mount name={{ data_dir_path }} src=LABEL=data fstype=auto opts=rw,nofail state=mounted
   when: data_block_dev_path is defined

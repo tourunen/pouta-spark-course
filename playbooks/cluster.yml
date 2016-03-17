@@ -67,7 +67,7 @@
         auto_ip: yes
         boot_from_volume: "{{ master_boot_from_volume }}"
         terminate_volume: yes
-        volume_size: 50
+        volume_size: 25
       tags: ['vm_creation']
 
     - name: attach master data volume
@@ -106,7 +106,7 @@
         auto_ip: no
         boot_from_volume: "{{ node_boot_from_volume }}"
         terminate_volume: yes
-        volume_size: 50
+        volume_size: 25
       with_sequence: count={{ num_nodes }}
       tags: ['vm_creation']
 
@@ -152,6 +152,7 @@
     - nodes
   vars:
     data_block_dev_path: "/dev/vdc"
+    data_dir_path: "/hadoop"
     selinux_state: "disabled"
   become: yes
   roles:
