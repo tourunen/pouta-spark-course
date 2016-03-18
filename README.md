@@ -21,6 +21,8 @@ See https://research.csc.fi/pouta-user-guide for details
 
 # Step 0: Set up a bastion host
 
+**NOTE: This whole step (Step 0) has to be done only once!**
+
 http://en.wikipedia.org/wiki/Bastion_host
 
 In case you don't have a readily available host for running OpenStack command line tools and Ansible, 
@@ -87,6 +89,8 @@ In this step we launch VMs in our cPouta project and configure them to act as a 
 for a simple cluster. You can run this on your management host, be it the bastion or your
 laptop.
 
+Enable / Check if you already have a virtuanenv by `workon ansible`. If yes, then skip this section.
+
 Make a python virtualenv called 'ansible2' and populate it
 
     mkvirtualenv ansible2
@@ -97,7 +101,7 @@ Source your OpenStack cPouta access credentials (actual filename will vary)::
     source ~/openrc.sh
     nova image-list
     
-Create a new key for the cluster (adapt the name) and upload it to OpenStack
+Create a new key for the cluster (adapt the name) and upload it to OpenStack (**NOTE: Only to be done if doing it for the first time!**)
 
     ssh-keygen -f ~/.ssh/id_rsa_mycluster
     nova keypair-add --pub-key ~/.ssh/id_rsa_mycluster my_key
@@ -121,23 +125,23 @@ Change the permissions on the config file
 
     chmod 600 ~/.ssh/config
 
-Examine *pouta-spark-course/playbooks/cluster.yml*, and edit to taste. Variables can be 
-also overridden on the command line, like in the example below 
+Now there are 2 ways of modifying the configurations and then setting up the cluster:
 
-Run the playbook
+  a. Examine *pouta-spark-course/playbooks/cluster.yml*, and edit to taste. And run:
+
+    ansible-playbook -v pouta-spark-course/playbooks/cluster.yml
+
+  **OR**
+
+  b. Or override the variables in the command line, like in the example below and run: 
     
     ansible-playbook -v \
         -e cluster_name=my-hdp -e ssh_key=my_key -e bastion_secgroup=bastion \
-        -e num_nodes=3 -e master_flavor=small \
+        -e num_nodes=3 -e master_flavor=small -e node_flavor=small \
         pouta-spark-course/playbooks/cluster.yml
- 
- 
+
+
 # Step 2: Install HDP with Ambari
-
-Login to your cluster master by using the internal IP of cluster master (Check Openstack UI).
-There is an auto-generated SSH Private Key, which we will use later.
-
-    cat ~/.ssh/id_rsa
 
 **Proxying Solution Here (Instance Security Groups)**
 
@@ -177,10 +181,15 @@ Login to the Ambari dashboard using default credentials
     username: admin
     password: admin
 
+Login to your cluster master by using the internal IP of cluster master (Check Openstack UI).
+Copy the auto-generated SSH Private Key, which we will use in the following section.
+
+    cat ~/.ssh/id_rsa
+
 On the Ambari dashboard click 'Launch Install Wizard'
 
-1. **Getting Started** : Name your cluster (We won't use this name in the following instructions rather the one defined earlier)
-2. **Select Stack** : Choose the latest HDP version
+1. **Getting Started** : Name your cluster (**We won't use this name in the following instructions. We will use the name defined earlier when ran cluster setup from bastion host**)
+2. **Select Stack** : Choose the latest HDP version (i.e. 2.3)
 3. **Install Options** : 
   - *Target Hosts* : Write down the following configuration
   ```
@@ -188,15 +197,11 @@ On the Ambari dashboard click 'Launch Install Wizard'
   <your-cluster-name>-node-[1-<num_nodes-defined-by-you>].novalocal
   ```
   - *Host Registration Information* : Paste the SSH Private Key from the cluster (Discussed earlier), including BEGIN and END lines.
+  - *SSH User Account*: cloud-user
 4. **Choose Services** : Just select HDFS, Yarn + MapReduce2, Zookeeper, Ambari Metrics and Spark. Uncheck every other option.
 5. **Assign Masters**: Move every component to cluster master and keep only zookeepers in the other nodes
 5. **Assign Slaves and Clients** : Check Client only for master. Check DataNode and NodeManager for all the nodes except master.
-6. **Customize Services** : The following configurations should be used:
-  - *HDFS* : Provide the namenode directory as `/mnt/data/hadoop/hdfs/namenode` and datanode directory as `/mnt/data/hadoop/hdfs/data`
-
-  - *YARN* : WIP
-
-    Click Proceed anyway on any pop-up dialog warning
+6. **Customize Services** : Click Next and then Click Proceed anyway on any pop-up dialog warning.
 7. **Review** : Check the configurations and then press Deploy
 8. **Install, Start and Test** : Wait for the installations to finish. If done, press Next
 9. **Summary** : Press Complete
@@ -209,6 +214,8 @@ Add a directory to HDFS for the notebook user
 
     sudo -u hdfs hadoop fs -mkdir /user/jovyan
     sudo -u hdfs hadoop fs -chown -R jovyan /user/jovyan
+
+*NOTE: If it says user exists, then skip*
 
 Pull the jupyter/pyspark-notebook image to use with tmpnb
 
