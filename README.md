@@ -277,7 +277,25 @@ Dont't forget to stop the SparkContext when done with `sc.stop()`
 
 # Step 4: Clean up
 
-nova delete cluster-master cluster-node-1 .... to the number of nodes
+To clean up the resources after the course is done, or to have a clean slate for another deployment, there is 
+a playbook called *cluster_destroy.yml*. By default it does not do anything, all the actions have to be enabled
+from the command line, just to be on a safe side.
 
-TBD
+Run these on your management/bastion host.
+ 
+To remove the nodes and the master, but leave the HDFS data volumes and security groups:
 
+    ansible-playbook -v \
+        -e cluster_name=my-hdp -e num_nodes=4 \ 
+        -e remove_master=1 \
+        -e remove_nodes=1 \
+        pouta-spark-course/playbooks/cluster_destroy.yml
+
+To remove the nodes, master, all volumes and security groups:
+
+    ansible-playbook -v \
+        -e cluster_name=my-hdp -e num_nodes=4 \
+        -e remove_master=1 -e remove_master_volumes=1 \
+        -e remove_nodes=1 -e remove_node_volumes=1 \
+        -e remove_security_groups=1 \
+        pouta-spark-course/playbooks/cluster_destroy.yml
