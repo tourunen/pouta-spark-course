@@ -3,14 +3,6 @@
   register: test_vg_data
   ignore_errors: yes
 
-# in case the volumes were there, activate them in case they are reused from a previous incarnation
-- name: activate lvs
-  command: lvchange -ay vg_data/{{ item }}
-  with_items:
-    - data
-    - swap
-  when: test_vg_data.rc!=5
-
 - name: Create a physical volume on {{ data_block_dev_path }}
   command: /usr/sbin/pvcreate {{ data_block_dev_path }}
   when: test_vg_data.rc==5
@@ -24,7 +16,7 @@
   register: swap_configured
   ignore_errors: yes
 
-- name: Scan for vg_data volume group
+- name: Scan for swap
   command: lvdisplay vg_data/swap
   register: test_lv_swap
   ignore_errors: yes
@@ -47,16 +39,6 @@
     fstype: swap
     state: present
 
-- name: Create logical volume for {{ data_dir_path }}
-  lvol: lv=data vg=vg_data size="100%FREE"
-
-- name: make sure local_data_dir exists
-  file: path={{ data_dir_path }} state=directory
-
-- name: format local data
-  filesystem: fstype=ext4 dev=/dev/mapper/vg_data-data opts="-L data"
-  when: data_block_dev_path is defined
-
-- name: mount local data
-  action: mount name={{ data_dir_path }} src=LABEL=data fstype=auto opts=rw,nofail state=mounted
-  when: data_block_dev_path is defined
+- name: Create logical volume for docker
+  lvol:
+    lv=docker vg=vg_data opts="-T" size="100%FREE"

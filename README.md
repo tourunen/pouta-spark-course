@@ -19,6 +19,16 @@ To use CSC cPouta cloud environment you will need
 
 See https://research.csc.fi/pouta-user-guide for details
 
+The system will consist of the following VMs:
+
+* bastion
+* cluster-master
+* cluster-node-[1..n]
+* cluster-notebook
+
+Public IPs (floating IPs in OpenStack) are assigned to *bastion* and *cluster-notebook*. Cluster master and 
+nodes are accessed only internally, through bastion.
+
 # Step 0: Set up a bastion host
 
 **NOTE: This whole step (Step 0) has to be done only once!**
@@ -65,7 +75,8 @@ Install dependencies and otherwise useful packages
 
     sudo yum install -y \
         dstat lsof bash-completion time tmux git xauth \
-        screen nano vim bind-utils nmap-ncat git\
+        screen nano vim bind-utils nmap-ncat git \
+        xauth firefox \
         centos-release-openstack python-novaclient \
         python-devel python-setuptools python-virtualenvwrapper
     
@@ -89,7 +100,7 @@ In this step we launch VMs in our cPouta project and configure them to act as a 
 for a simple cluster. You can run this on your management host, be it the bastion or your
 laptop.
 
-Enable / Check if you already have a virtuanenv by `workon ansible`. If yes, then skip this section.
+Enable / Check if you already have a virtualenv by `workon ansible`. If yes, then skip this section.
 
 Make a python virtualenv called 'ansible2' and populate it
 
@@ -143,43 +154,26 @@ Now there are 2 ways of modifying the configurations and then setting up the clu
 
 # Step 2: Install HDP with Ambari
 
-**Proxying Solution Here (Instance Security Groups)**
+Next we need to access the Ambari web interface to install HDP. There are a few options for this. 
 
-Setup https for ambari server. First stop ambari-server
- 
-    sudo systemctl stop ambari-server
-    
-Then configure https 
+**Option 1**. You can open a SOCKS proxy tunnel through bastion host with
 
-    sudo ambari-server setup-security
+    ssh -D 9999 cloud-user@<your-bastion-public-ip>
 
-    Security setup options...
-    ===========================================================================
-    Choose one of the following options: 
-      [1] Enable HTTPS for Ambari server.
-      [2] Encrypt passwords stored in ambari.properties file.
-      [3] Setup Ambari kerberos JAAS configuration.
-      [4] Setup truststore.
-      [5] Import certificate to truststore.
-    ===========================================================================
-    Enter choice, (1-5): 1
-    Do you want to configure HTTPS [y/n] (y)? 
-    SSL port [8443] ? 
-    Enter path to Certificate: /etc/ambari-server/ssl/server.crt
-    Enter path to Private Key: /etc/ambari-server/ssl/server.key
-    Please enter password for Private Key: 
+and then point your (secondary) browser to use localhost:9999 as a SOCKS proxy server
 
-Start the server once again
+**Option 2**. You can open the browser itself on the bastion host, and make use of X forwarding. 
 
-    sudo systemctl start ambari-server
+    ssh -Y cloud-user@<your-bastion-public-ip> firefox --no-remote
 
-Check the public ip of your cluster master (Openstack UI)
-Open a browser and navigate to https://\<public-ip-of-the-cluster-master\>:8443
+After setting up either forwarding option, navigate to https://\<private-ip-of-the-cluster-master\>:8080
 
 Login to the Ambari dashboard using default credentials
 
     username: admin
     password: admin
+
+Change the default password right away by selecting User + Group Management -> Users -> admin -> Change Password.
 
 Login to your cluster master by using the internal IP of cluster master (Check Openstack UI).
 Copy the auto-generated SSH Private Key, which we will use in the following section.
@@ -194,13 +188,16 @@ On the Ambari dashboard click 'Launch Install Wizard'
   - *Target Hosts* : Write down the following configuration
   ```
   <your-cluster-name>-master.novalocal
+  <your-cluster-name>-notebook.novalocal
   <your-cluster-name>-node-[1-<num_nodes-defined-by-you>].novalocal
   ```
   - *Host Registration Information* : Paste the SSH Private Key from the cluster (Discussed earlier), including BEGIN and END lines.
   - *SSH User Account*: cloud-user
 4. **Choose Services** : Just select HDFS, Yarn + MapReduce2, Zookeeper, Ambari Metrics and Spark. Uncheck every other option.
-5. **Assign Masters**: Move every component to cluster master and keep only zookeepers in the other nodes
-5. **Assign Slaves and Clients** : Check Client only for master. Check DataNode and NodeManager for all the nodes except master.
+5. **Assign Masters**: Move every component to cluster master. Remove extra zookeepers
+5. **Assign Slaves and Clients** : 
+  - Check Client for master and notebook. 
+  - Check DataNode and NodeManager for the nodes (excluding master and notebook)
 6. **Customize Services** : Click Next and then Click Proceed anyway on any pop-up dialog warning.
 7. **Review** : Check the configurations and then press Deploy
 8. **Install, Start and Test** : Wait for the installations to finish. If done, press Next
@@ -210,7 +207,11 @@ Now you have the Spark Cluster running and you can proceed with the next step.
 
 # Step 3: Run notebooks with custom tmpnb
 
-Add a directory to HDFS for the notebook user
+We are ready to prepare the notebook host, that will serve users with temporary notebook instances.
+
+SSH in to the notebook host.
+
+On the notebook host, Add a directory to HDFS for the notebook user
 
     sudo -u hdfs hadoop fs -mkdir /user/jovyan
     sudo -u hdfs hadoop fs -chown -R jovyan /user/jovyan
@@ -235,8 +236,8 @@ Generate a password hash for the notebooks
 
     sudo docker run jupyter/pyspark-notebook python3 -c "from IPython.lib import passwd; print(passwd('dont_use_this'))"
     
-Now run the image which we just built and tagged. This runs 2 notebook containers, keeping tmpnb in the foreground - 
-good for debugging
+Now run the image which we just built and tagged. This runs 2 notebook containers (pool_size), the inactivity 
+timeout (cull_timeout) is set to 15 minutes. The option -it keeps tmpnb in the foreground - good for debugging. 
 
     sudo docker run -it \
         --net=host \
@@ -245,6 +246,7 @@ good for debugging
         csc/tmpnb \
         python orchestrate.py \
             --pool_size=2 \
+            --cull_timeout=900 \
             --host_directories=/usr/hdp/:/usr/hdp/:ro,/etc/hadoop/:/etc/hadoop/:ro \
             --host_network=True \
             --image='jupyter/pyspark-notebook' \
@@ -255,7 +257,8 @@ good for debugging
                 --NotebookApp.password=THE_HASH_FROM_ABOVE \
                 --NotebookApp.trust_xheaders=True"'
 
-After the containers start running (Can be checked by `sudo docker ps -a`), open the browser and point to http://\<public-ip>:8000
+After the containers start running (Can be checked by `sudo docker ps -a`), open the browser and point it to 
+http://\<public-ip-of-the-notebook-host>:8000
 
 Now open a Jupyter Python3 notebook and write the following code.
 
@@ -273,7 +276,7 @@ Now open a Jupyter Python3 notebook and write the following code.
     
     sc.version
 
-Dont't forget to stop the SparkContext when done with `sc.stop()`
+Don't forget to stop the SparkContext when done with `sc.stop()`
 
 # Step 4: Clean up
 

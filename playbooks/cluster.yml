@@ -5,11 +5,13 @@
   vars:
     cluster_name: "spark-cluster"
     master_flavor: "mini"
-    num_nodes: 2
+    notebook_flavor: "mini"
     node_flavor: "mini"
+    num_nodes: 2
     ssh_key: cluster_key
-    master_boot_from_volume: yes
-    node_boot_from_volume: yes
+    master_boot_from_volume: no
+    notebook_boot_from_volume: no
+    node_boot_from_volume: no
     network_name: ""
     bastion_secgroup: "bastion"
     data_volume_size: 200
@@ -25,20 +27,66 @@
     - name: master security group - create
       os_security_group:
         name: "{{ cluster_name }}-master"
-        description: "Ansible generated security group for {{ cluster_name }} master"
+        description: "Ansible generated security group for {{ cluster_name }}-master"
+      tags: ['secgroup_creation']
+
+    - name: notebook security group - create
+      register: sg_notebook
+      os_security_group:
+        name: "{{ cluster_name }}-notebook"
+        description: "Ansible generated security group for {{ cluster_name }}-notebook"
       tags: ['secgroup_creation']
 
     - name: common security group - create
       register: sg_common
       os_security_group:
         name: "{{ cluster_name }}-common"
-        description: "Ansible generated security group for {{ cluster_name }} nodes"
+        description: "Ansible generated security group for {{ cluster_name }}"
       tags: ['secgroup_creation']
 
     # remote_group workaround for https://github.com/ansible/ansible-modules-core/issues/2855
     - name: common security group - open cluster internal access
       os_security_group_rule:
         security_group: "{{ cluster_name }}-common"
+        remote_group: "{{ item[0] }}"
+        protocol: "{{ item[1] }}"
+      with_nested:
+        - ["{{ sg_common.secgroup.id }}", "{{ sg_bastion.secgroup.id }}" ]
+        - ["tcp", "udp", "icmp"]
+      tags: ['secgroup_creation']
+
+    - name: master security group - open access from notebook
+      os_security_group_rule:
+        security_group: "{{ cluster_name }}-master"
+        remote_group: "{{ sg_notebook.secgroup.id }}"
+        protocol: "tcp"
+        port_range_min: "{{ item }}"
+        port_range_max: "{{ item }}"
+      # 6188: ambari metric collector
+      # 7077: spark master
+      # 8020: hdfs
+      # 8050: yarn
+      # 8080: ambari api
+      # 8188: spark timeline
+      # 8440: ambari agent
+      # 8441: ambari agent
+      with_items: [6188, 7077, 8020, 8050, 8080, 8188, 8440, 8441]
+      tags: ['secgroup_creation']
+
+    - name: common security group - open access from notebook
+      os_security_group_rule:
+        security_group: "{{ cluster_name }}-common"
+        remote_group: "{{ sg_notebook.secgroup.id }}"
+        protocol: "tcp"
+        port_range_min: "{{ item }}"
+        port_range_max: "{{ item }}"
+      # 50010: hdfs
+      with_items: [50010]
+      tags: ['secgroup_creation']
+
+    - name: notebook security group - access from cluster and bastion
+      os_security_group_rule:
+        security_group: "{{ cluster_name }}-notebook"
         remote_group: "{{ item[0] }}"
         protocol: "{{ item[1] }}"
       with_nested:
@@ -64,7 +112,7 @@
         security_groups:
           - "{{ cluster_name }}-common"
           - "{{ cluster_name }}-master"
-        auto_ip: yes
+        auto_ip: no
         boot_from_volume: "{{ master_boot_from_volume }}"
         terminate_volume: yes
         volume_size: 25
@@ -83,6 +131,44 @@
         ansible_ssh_user: cloud-user
         public_ip: "{{ master_vm.openstack.public_v4 }}"
         public_name: "{{ lookup('dig', master_vm.openstack.public_v4 + '/PTR', wantlist=True)[0] }}"
+      tags: ['vm_creation']
+
+    - name: create persistent data volume for notebook host
+      os_volume:
+        display_name: "{{ cluster_name }}-notebook-data"
+        size: "{{ data_volume_size }}"
+        volume_type: "{{ data_volume_type }}"
+        state: present
+
+    - name: create cluster notebook VM
+      register: notebook_vm
+      os_server:
+        name: "{{ cluster_name }}-notebook"
+        flavor: "{{ notebook_flavor }}"
+        image: "CentOS-7.0"
+        key_name: "{{ ssh_key }}"
+        network: "{{ network_name }}"
+        security_groups:
+          - "{{ cluster_name }}-notebook"
+        auto_ip: yes
+        boot_from_volume: "{{ notebook_boot_from_volume }}"
+        terminate_volume: yes
+        volume_size: 25
+      tags: ['vm_creation']
+
+    - name: attach notebook data volume
+      os_server_volume:
+        server: "{{ cluster_name }}-notebook"
+        volume: "{{ cluster_name }}-notebook-data"
+
+    - name: add notebook to inventory
+      add_host:
+        name: "{{ cluster_name }}-notebook"
+        groups: notebooks
+        ansible_ssh_host: "{{ notebook_vm.openstack.private_v4 }}"
+        ansible_ssh_user: cloud-user
+        public_ip: "{{ notebook_vm.openstack.public_v4 }}"
+        public_name: "{{ lookup('dig', notebook_vm.openstack.public_v4 + '/PTR', wantlist=True)[0] }}"
       tags: ['vm_creation']
 
     - name: create persistent data volumes for nodes
@@ -135,6 +221,16 @@
       delay: 5
       tags: ["wait_for_ssh"]
 
+    - name: wait for notebook to come up
+      command: >
+        ssh -o BatchMode=yes
+        cloud-user@{{ notebook_vm.openstack.private_v4 }} true
+      register: result
+      until: result|success
+      retries: 300
+      delay: 5
+      tags: ["wait_for_ssh"]
+
     - name: wait for nodes to come up
       command: >
         ssh -o BatchMode=yes
@@ -146,19 +242,37 @@
       with_items: "{{ node_vms.results }}"
       tags: ["wait_for_ssh"]
 
-- name: Configure common parts
+- name: Base installation
+  hosts:
+    - masters
+    - notebooks
+    - nodes
+  become: yes
+  roles:
+    - base
+
+- name: Configure common cluster
+  hosts:
+    - masters
+    - notebooks
+    - nodes
+  vars:
+    selinux_state: "disabled"
+  become: yes
+  roles:
+    - cluster_common
+    - conda
+
+- name: Volume data directory on HDP nodes
   hosts:
     - masters
     - nodes
   vars:
     data_block_dev_path: "/dev/vdc"
     data_dir_path: "/hadoop"
-    selinux_state: "disabled"
   become: yes
   roles:
-    - base
-    - cluster_common
-    - conda
+    - volume_data_dir
 
 - name: Configure master
   hosts:
@@ -167,4 +281,12 @@
   roles:
     - cluster_master
     - ambari_server
+
+- name: Configure notebook
+  hosts:
+    - notebooks
+  vars:
+    data_block_dev_path: "/dev/vdc"
+  become: yes
+  roles:
     - notebook_host
