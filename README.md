@@ -7,10 +7,14 @@
 This repository is an example of how to setup a temporary course environment with 
 Apache Spark and Jupyter notebooks in CSC's cPouta environment.
 
+## Software and technologies used
+
 The procedure will use: 
 * Ansible for setting up and configuring a basic cluster with one master and multiple slaves.
 * Apache Ambari to set up Hortonworks Data Platform 
 * Docker and tmpnb to serve Jupyter notebooks for the students
+
+## Prerequisites
 
 To use CSC cPouta cloud environment you will need
 
@@ -19,6 +23,10 @@ To use CSC cPouta cloud environment you will need
 
 See https://research.csc.fi/pouta-user-guide for details
 
+Depending on your needs, you may need to apply for more resources in your cPouta project.
+
+## What will be deployed
+
 The system will consist of the following VMs:
 
 * bastion
@@ -26,8 +34,39 @@ The system will consist of the following VMs:
 * cluster-node-[1..n]
 * cluster-notebook
 
+**bastion**
+* acts as a ssh jump host 
+
+**cluster-master**
+* runs Ambari
+* runs HDP master processes (HDFS, MapReduce, YARN, Monitoring)
+* will have a volume (=persistent storage) mounted on /hadoop
+
+**cluster-nodes**
+* run HDFS storage
+* run MapReduce and YARN workers
+* will have a volume mounted on /hadoop
+
+**cluster-notebook**
+* will run Docker
+* will run tmpfs for orchestrating on-demand notebooks
+* has a volume configured for Docker storage as thin-provisioned LVM pool
+
 Public IPs (floating IPs in OpenStack) are assigned to *bastion* and *cluster-notebook*. Cluster master and 
 nodes are accessed only internally, through bastion.
+
+All VMs will the default CentOS 7 image provided by CSC.  
+
+## Security implications, recommendations and shortcomings
+
+* If possible, limit the IP range where the notebooks can be accessed. A denial of service by continuously 
+  claiming all notebooks in the pool is trivial  
+* The notebooks will share the same account in Spark and HDFS, so the users need to be trusted to behave.
+* A misbehaving user can hog all the resources in the cluster
+* You *must* protect Ambari admin account with a proper password, the notebooks have network access to it
+* When the event is done, tear the resources down (with the possible exclusion of *bastion*) 
+* Keep a keen eye on the resources while they are active
+
 
 # Step 0: Set up a bastion host
 
@@ -209,6 +248,13 @@ Now you have the Spark Cluster running and you can proceed with the next step.
 
 We are ready to prepare the notebook host, that will serve users with temporary notebook instances.
 
+First, open network access to your current IP for testing the setup internally. Go to cPouta www-interface and
+add a security group rule to your cluster's <cluster-name>-notebook -group.
+ 
+ * protocol: TCP
+ * port 8000
+ * CIDR: your IP x.y.z.t/32 (take a look at 'ip a' or check it online, search for "what is my ipv4")
+
 SSH in to the notebook host.
 
 On the notebook host, Add a directory to HDFS for the notebook user
@@ -277,6 +323,8 @@ Now open a Jupyter Python3 notebook and write the following code.
     sc.version
 
 Don't forget to stop the SparkContext when done with `sc.stop()`
+
+When you are happy with the setup, open the access for desired range of IP address the users are coming from.
 
 # Step 4: Clean up
 
