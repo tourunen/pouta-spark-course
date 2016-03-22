@@ -257,14 +257,21 @@ Now you have the Spark Cluster running and you can proceed with the next step.
 
 We are ready to prepare the notebook host, that will serve users with temporary notebook instances.
 
-First, open network access to your current IP for testing the setup internally. Go to cPouta www-interface and
-add a security group rule to your cluster's <cluster-name>-notebook -group.
+First, open network access to your current IP for testing the setup internally. If you want to serve the notebooks 
+to users over plain http, open port 80. If you would like to use https, use open 443. You can also open both
+ports by creating two rules. Go to cPouta www-interface and add security group rules to your cluster's 
+<cluster-name>-notebook -group. 
  
  * protocol: TCP
- * port 8000
+ * port 80 or 443
  * CIDR: your IP x.y.z.t/32 (take a look at 'ip a' or check it online, search for "what is my ipv4")
 
 SSH in to the notebook host using its private IP from your bastion host.
+
+There is an nginx proxy process forwarding traffic from ports 80 (http) and 443 (https) to tmpnb at port 8000. 
+The proxy also takes care of authentication. Add user/password to nginx htaccess file on the notebook host
+  
+    sudo htpasswd -c /etc/nginx/.htpasswd example_user
 
 On the notebook host, Add a directory to HDFS for the notebook user
 
@@ -287,10 +294,6 @@ Setup the proxy first to run tmpnb
     
     sudo docker run --net=host -d -e CONFIGPROXY_AUTH_TOKEN=$TOKEN --name=proxy jupyter/configurable-http-proxy --default-target http://127.0.0.1:9999
 
-Generate a password hash for the notebooks
-
-    sudo docker run jupyter/pyspark-notebook python3 -c "from IPython.lib import passwd; print(passwd('dont_use_this'))"
-    
 Now run the image which we just built and tagged. This runs 2 notebook containers (pool_size), the inactivity 
 timeout (cull_timeout) is set to 15 minutes. The option -it keeps tmpnb in the foreground - good for debugging. 
 
@@ -309,11 +312,11 @@ timeout (cull_timeout) is set to 15 minutes. The option -it keeps tmpnb in the f
                 "--NotebookApp.base_url={base_path} \
                 --ip=0.0.0.0 \
                 --port={port} \
-                --NotebookApp.password=THE_HASH_FROM_ABOVE \
+                --NotebookApp.allow_origin=* \
                 --NotebookApp.trust_xheaders=True"'
 
 After the containers start running (Can be checked by `sudo docker ps -a`), open the browser and point it to 
-http://\<public-ip-of-the-notebook-host>:8000
+http://\<public-ip-of-the-notebook-host>
 
 Now open a Jupyter Python3 notebook and write the following code.
 

@@ -290,3 +290,13 @@
   become: yes
   roles:
     - notebook_host
+
+- name: Print resource info
+  hosts:
+    - localhost
+  tasks:
+  - debug:
+      msg: >
+        Master has private IP {{ master_vm.openstack.private_v4 }}.
+        Notebook has private IP {{ notebook_vm.openstack.private_v4 }} and
+        public IP {{ notebook_vm.openstack.public_v4 }}.

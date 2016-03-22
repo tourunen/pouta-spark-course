@@ -5,3 +5,5 @@
 
 - name: install miniconda to /opt/conda
   shell: /bin/bash /tmp/miniconda.sh -f -b -p /opt/conda
+  args:
+    creates: /opt/conda
