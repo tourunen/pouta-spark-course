@@ -6,12 +6,29 @@
 - name: install docker
   yum: name=docker state=present
 
-- name: Upload custom docker storage configuration
+- name: upload custom docker storage configuration
   template:
-    src=etc/sysconfig/docker-storage.j2
-    dest=/etc/sysconfig/docker-storage
-    backup=True
+    src: etc/sysconfig/docker-storage.j2
+    dest: /etc/sysconfig/docker-storage
+    backup: True
   notify: restart docker
 
 - name: enable docker service
   service: name=docker state=running enabled=yes
+
+- name: install nginx and httpd-tools
+  yum: name={{ item }} state=present
+  with_items:
+    - nginx
+    - httpd-tools
+
+- name: copy proxy config to nginx
+  template:
+    src: etc/nginx/nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    backup: True
+  notify: restart nginx
+
+- name: enable nginx service
+  service: name=nginx state=running enabled=yes
+
