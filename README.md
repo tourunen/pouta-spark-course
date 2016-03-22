@@ -199,7 +199,11 @@ Next we need to access the Ambari web interface to install HDP. There are a few 
 
     ssh -D 9999 cloud-user@<your-bastion-public-ip>
 
-and then point your (secondary) browser to use localhost:9999 as a SOCKS proxy server
+If you get this warning (even though you manage to login to bastion) `bind: Cannot assign requested address`, then please use the following command instead (which forces the SSH mechanism to use ipv4)
+
+    ssh -4 -D 9999 cloud-user@<your-bastion-public-ip>
+
+and then configure your (secondary) browser to use localhost:9999 as a SOCKS proxy server in proxy settings
 
 **Option 2**. You can open the browser itself on the bastion host, and make use of X forwarding. 
 
