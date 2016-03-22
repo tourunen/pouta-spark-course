@@ -205,7 +205,7 @@ and then point your (secondary) browser to use localhost:9999 as a SOCKS proxy s
 
     ssh -Y cloud-user@<your-bastion-public-ip> firefox --no-remote
 
-After setting up either forwarding option, navigate to https://\<private-ip-of-the-cluster-master\>:8080
+After setting up either forwarding option, navigate to http://\<private-ip-of-the-cluster-master\>:8080
 
 Login to the Ambari dashboard using default credentials
 
@@ -237,7 +237,16 @@ On the Ambari dashboard click 'Launch Install Wizard'
 5. **Assign Slaves and Clients** : 
   - Check Client for master and notebook. 
   - Check DataNode and NodeManager for the nodes (excluding master and notebook)
-6. **Customize Services** : Click Next and then Click Proceed anyway on any pop-up dialog warning.
+6. **Customize Services** : Change to the specified tabs
+  - *Spark* : Go to 'Advanced spark-env' -> 'spark-env template' and replace `export JAVA_HOME={{java_home}}` by `#export JAVA_HOME={{java_home}}`
+
+    Now Go to custom-spark-defaults section and click on add property for each of these entries (each entry has a 'key' and corresponding 'value'):
+
+    * *Key*: spark.master *Value*: yarn-client
+    * *Key*: spark.executor.instances *Value*: 5
+    * *Key*: spark.executor.memory *Value*: 512m
+
+   Click Next and then Click Proceed anyway on any pop-up dialog warning.
 7. **Review** : Check the configurations and then press Deploy
 8. **Install, Start and Test** : Wait for the installations to finish. If done, press Next
 9. **Summary** : Press Complete
@@ -255,7 +264,7 @@ add a security group rule to your cluster's <cluster-name>-notebook -group.
  * port 8000
  * CIDR: your IP x.y.z.t/32 (take a look at 'ip a' or check it online, search for "what is my ipv4")
 
-SSH in to the notebook host.
+SSH in to the notebook host using its private IP from your bastion host.
 
 On the notebook host, Add a directory to HDFS for the notebook user
 
@@ -293,7 +302,7 @@ timeout (cull_timeout) is set to 15 minutes. The option -it keeps tmpnb in the f
         python orchestrate.py \
             --pool_size=2 \
             --cull_timeout=900 \
-            --host_directories=/usr/hdp/:/usr/hdp/:ro,/etc/hadoop/:/etc/hadoop/:ro \
+            --host_directories=/usr/hdp/:/usr/hdp/:ro,/etc/hadoop/:/etc/hadoop/:ro,/etc/spark/:/etc/spark/:ro \
             --host_network=True \
             --image='jupyter/pyspark-notebook' \
             --command='start-notebook.sh \
@@ -310,15 +319,11 @@ Now open a Jupyter Python3 notebook and write the following code.
 
     import os
     os.environ["PYSPARK_PYTHON"]="/opt/conda/bin/python3"
-    os.environ["YARN_CONF_DIR"]="/etc/hadoop/conf/"
     os.environ["SPARK_HOME"]="/usr/hdp/current/spark-client"
     os.environ["HDP_VERSION"]="current"
     
     import pyspark
-    conf = pyspark.SparkConf()
-    conf.set("spark.master", "yarn-client")
-    conf.setAppName("Yarn Jupyter")
-    sc = pyspark.SparkContext(conf=conf) 
+    sc = pyspark.SparkContext() 
     
     sc.version
 
