@@ -16,6 +16,24 @@
 - name: enable docker service
   service: name=docker state=running enabled=yes
 
+- name: create certificate dir
+  file:
+    dest: "/etc/nginx/ssl"
+    owner: root
+    group: root
+    mode: 0600
+    state: directory
+
+- name: create self-signed SSL cert
+  command: >
+    openssl req -new -nodes -x509
+    -subj "/C=FI/ST=SouthernFinland/L=Espoo/O=IT/CN={{ ansible_hostname }}"
+    -days 3650
+    -extensions v3_ca
+    -keyout /etc/nginx/ssl/server.key
+    -out /etc/nginx/ssl/server.crt
+    creates=/etc/nginx/ssl/server.crt
+
 - name: install nginx and httpd-tools
   yum: name={{ item }} state=present
   with_items:
