@@ -337,6 +337,19 @@ Now open a Jupyter Python3 notebook and write the following code.
 Don't forget to stop the SparkContext when done with `sc.stop()`
 
 When you are happy with the setup, open the access for desired range of IP address the users are coming from.
+ 
+## Additional security: limit outgoing traffic from notebook host
+ 
+If the notebooks that the users are going to run don't need access to arbitrary addresses in the internet, it is a
+good idea to limit the outgoing traffic from the notebooks. This is done by removing the default egress (=outbound) 
+security group rules that allow all outbound IPv4 and IPv6 traffic from the <cluster>-notebook security group. 
+
+In Horizon, security groups, find your <cluster>-notebook group, select manage rules and remove these two rules: 
+
+    Egress	IPv4	Any	-	0.0.0.0/0 (CIDR) 
+    Egress	IPv6	Any	-	::/0 (CIDR)
+
+There is already a rule that allows traffic destined to internal networks, that is created by the installation playbook.
 
 # Step 4: Clean up
 
