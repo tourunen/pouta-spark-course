@@ -94,6 +94,14 @@
         - ["tcp", "udp", "icmp"]
       tags: ['secgroup_creation']
 
+    # add a rule to allow outgoing traffic to local network, so that the default rule of allowing
+    # outgoing anywhere can be dropped after the setup
+    - name: notebook security group - allow outgoing to local network
+      os_security_group_rule:
+        security_group: "{{ cluster_name }}-notebook"
+        direction: egress
+        remote_ip_prefix: "192.168.0.0/16"
+
     - name: create persistent data volume for master
       os_volume:
         display_name: "{{ cluster_name }}-master-data"
