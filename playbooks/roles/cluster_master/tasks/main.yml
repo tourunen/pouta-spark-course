@@ -32,17 +32,14 @@
 - name: install maven
   yum: name=maven state=present
 
-- name: download rest api for yarnstatus
-  get_url: url="https://github.com/apurva3000/yarn-status/archive/v1.tar.gz" dest=/tmp/yarnstatus.tar.gz
+- name: download and extract the rest api code for checking yarn resource status
+  unarchive: src="https://github.com/apurva3000/yarn-status/archive/beta.tar.gz" dest=/tmp copy=no
 
-- name: extract yarnstatus tar ball
-  command: /bin/tar xfz /tmp/yarnstatus.tar.gz -C /tmp/
-
-- name: compile the yarnstatus rest api code using maven
-  command: chdir=/tmp/yarn-status-1 /usr/bin/mvn compile war:war
+- name: compile the yarn resource status rest api code using maven
+  command: chdir=/tmp/yarn-status-beta /usr/bin/mvn compile war:war
 
 - name: move the generated war to tomacat webapps directory
-  command: mv /tmp/yarn-status-1/target/YarnStatus-1.0.war /var/lib/tomcat/webapps/YarnStatus-1.0.war
+  command: mv /tmp/yarn-status-beta/target/ResourceStatus-beta.war /var/lib/tomcat/webapps/ResourceStatus-beta.war
 
 - name: Start Tomcat
   service: name=tomcat state=started enabled=yes
