@@ -67,10 +67,11 @@
       # 8020: hdfs
       # 8050: yarn
       # 8080: ambari api
+      # 8081: resource status check api
       # 8188: spark timeline
       # 8440: ambari agent
       # 8441: ambari agent
-      with_items: [6188, 7077, 8020, 8050, 8080, 8188, 8440, 8441]
+      with_items: [6188, 7077, 8020, 8050, 8080, 8081, 8188, 8440, 8441]
       tags: ['secgroup_creation']
 
     - name: master security group - open DNS from notebook

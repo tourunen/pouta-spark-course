@@ -35,6 +35,9 @@
 - name: download and extract the rest api code for checking yarn resource status
   unarchive: src="https://github.com/apurva3000/yarn-status/archive/beta.tar.gz" dest=/tmp copy=no
 
+- name: clean the target before building the war
+  command: chdir=/tmp/yarn-status-beta /usr/bin/mvn clean
+
 - name: compile the yarn resource status rest api code using maven
   command: chdir=/tmp/yarn-status-beta /usr/bin/mvn compile war:war
 
