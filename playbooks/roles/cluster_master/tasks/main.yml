@@ -15,3 +15,34 @@
     line: "-A INPUT -p udp -m udp --dport 53 -j ACCEPT"
     dest: /etc/sysconfig/iptables
     insertbefore: '^-A INPUT'
+
+- name: install java 1.8 jdk
+  yum: name=java-1.8.0-openjdk-devel state=present
+
+- name: install tomcat
+  yum: name=tomcat state=present
+
+- name: install tomcat webapps
+  yum: name=tomcat-webapps state=present
+
+- name: configure tomcat server
+  copy: src=roles/cluster_master/files/server.xml dest=/etc/tomcat/server.xml
+  notify: restart tomcat
+
+- name: install maven
+  yum: name=maven state=present
+
+- name: download rest api for yarnstatus
+  get_url: url="https://github.com/apurva3000/yarn-status/archive/v1.tar.gz" dest=/tmp/yarnstatus.tar.gz
+
+- name: extract yarnstatus tar ball
+  command: /bin/tar xfz /tmp/yarnstatus.tar.gz -C /tmp/
+
+- name: compile the yarnstatus rest api code using maven
+  command: chdir=/tmp/yarn-status-1 /usr/bin/mvn compile war:war
+
+- name: move the generated war to tomacat webapps directory
+  command: mv /tmp/yarn-status-1/target/YarnStatus-1.0.war /var/lib/tomcat/webapps/YarnStatus-1.0.war
+
+- name: Start Tomcat
+  service: name=tomcat state=started enabled=yes
