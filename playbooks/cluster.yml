@@ -300,6 +300,24 @@
     - cluster_master
     - ambari_server
 
+- name: Ambari agents
+  hosts:
+    - masters
+    - notebooks
+    - nodes
+  become: yes
+  roles:
+    - ambari_agents
+
+- name: Provision cluster using ambari
+  hosts:
+    - localhost
+  become: yes
+  vars:
+    master_private_ip: "{{ hostvars[groups['masters'][0]]['ansible_ssh_host'] }}"
+  roles:
+    - ambari_blueprints
+
 - name: Configure notebook
   hosts:
     - notebooks
