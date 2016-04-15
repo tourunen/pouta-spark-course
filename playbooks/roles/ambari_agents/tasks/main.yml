@@ -1,0 +1,15 @@
+- name: add ambari repository
+  get_url:
+    url: http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.2.0.0/ambari.repo
+    dest: /etc/yum.repos.d/ambari.repo
+
+- name: install ambari-agent
+  yum: name={{ item }}
+  with_items:
+    - ambari-agent
+
+- name: set hostnames on ambari agents
+  lineinfile: dest=/etc/ambari-agent/conf/ambari-agent.ini regexp=^hostname= line=hostname={{cluster_name}}-master
+
+- name: start ambari agents
+  service: name=ambari-agent state=running enabled=yes

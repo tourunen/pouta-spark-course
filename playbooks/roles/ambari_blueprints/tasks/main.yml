@@ -1,0 +1,11 @@
+- name: Copy the blueprint to a temporary location
+  copy: src=spark_blueprint.json dest=/tmp/spark_blueprint.json
+
+- name: POST the spark blueprint to the ambari server
+  script: blueprints.sh {{ master_private_ip }}
+
+- name: Template out the cluster configuration to a temp location
+  template: src=cluster_hdp.json.j2 dest=/tmp/cluster_hdp.json
+
+- name: POST the cluster configuration to read the blueprint and create the cluster
+  script: cluster_create.sh {{ master_private_ip }} {{ cluster_name }}

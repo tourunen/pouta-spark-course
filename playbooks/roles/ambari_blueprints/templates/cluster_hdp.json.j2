@@ -1,0 +1,36 @@
+{
+  "blueprint" : "spark-hdfs",
+  "default_password" : "spark",
+  "host_groups" :[
+    {
+      "name" : "host_group_1", 
+      "hosts" : [         
+        {
+          "fqdn" : "{{ cluster_name }}-master.novalocal"
+        }
+      ]
+    },
+    {
+      "name" : "host_group_2", 
+      "hosts" : [
+    
+	{% for node_number in range(num_nodes|int) %}
+        {
+          "fqdn" : "{{ cluster_name }}-node-{{ node_number + 1 }}.novalocal"
+        }
+        {% if node_number + 1 != num_nodes|int %}
+        ,
+        {% endif %}
+	{% endfor %}
+      ]
+    },
+    {
+       "name" : "host_group_3",
+       "hosts": [
+         {
+           "fqdn" : "{{ cluster_name }}-notebook.novalocal"
+         }
+      ]
+    }
+  ]
+}
