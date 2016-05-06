@@ -117,7 +117,8 @@ Install dependencies and otherwise useful packages
         screen nano vim bind-utils nmap-ncat git \
         xauth firefox \
         centos-release-openstack python-novaclient \
-        python-devel python-setuptools python-virtualenvwrapper
+        python-devel python-setuptools python-virtualenvwrapper \
+        libffi-devel openssl-devel
     
     sudo yum groupinstall -y "Development Tools"
 
@@ -154,7 +155,7 @@ Source your OpenStack cPouta access credentials (actual filename will vary)::
 Create a new key for the cluster (adapt the name) and upload it to OpenStack (**NOTE: Only to be done if doing it for the first time!**)
 
     ssh-keygen -f ~/.ssh/id_rsa_mycluster
-    nova keypair-add --pub-key ~/.ssh/id_rsa_mycluster my_key
+    nova keypair-add --pub-key ~/.ssh/id_rsa_mycluster.pub my_key
 
 Clone this example repo
 
